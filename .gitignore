@@ -1,0 +1,21 @@
+# Gradle
+.gradle/
+build/
+**/build/
+
+# Local SDK
+local.properties
+
+# IDE
+.idea/
+*.iml
+
+# macOS
+.DS_Store
+
+# Signing
+*.jks
+*.keystore
+
+# Local release signing (never commit)
+keystore.properties

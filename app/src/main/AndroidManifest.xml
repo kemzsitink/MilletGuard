@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- Granted by the user through ACTION_MANAGE_WRITE_SETTINGS, not a system-only permission. -->
+    <uses-permission
+        android:name="android.permission.WRITE_SETTINGS"
+        tools:ignore="ProtectedPermissions" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <!--
+      Narrow package visibility only for the signals MilletGuard needs. This avoids
+      QUERY_ALL_PACKAGES while allowing best-effort discovery of FCM/GCM receivers
+      and the Google Play services diagnostics activity.
+    -->
+    <queries>
+        <intent>
+            <action android:name="com.google.firebase.MESSAGING_EVENT" />
+        </intent>
+        <intent>
+            <action android:name="com.google.android.c2dm.intent.RECEIVE" />
+        </intent>
+        <package android:name="com.google.android.gms" />
+        <package android:name="com.miui.securitycenter" />
+    </queries>
+
+    <application
+        android:allowBackup="false"
+        android:icon="@drawable/app_icon"
+        android:label="@string/app_name"
+        android:theme="@style/AppTheme"
+        android:localeConfig="@xml/locales_config"
+        android:supportsRtl="true"
+        tools:targetApi="tiramisu">
+
+        <!--
+          MilletGuard intentionally targets SDK 22 so WRITE_SETTINGS can modify Xiaomi's
+          private Settings.System whitelist. Old-target apps can otherwise be placed
+          into legacy aspect-ratio compatibility mode on tall modern displays, which
+          HyperOS shows as a large black area below the app. Explicitly opt the main
+          activity into modern tall/resizable layouts while keeping targetSdk 22.
+        -->
+        <meta-data
+            android:name="android.max_aspect"
+            android:value="3.0" />
+
+        <!--
+          The launcher entry point lives in an activity-alias so the home-screen icon
+          can be hidden at runtime (LauncherAlias) while MainActivity stays reachable
+          through the Quick Settings tile long-press (ACTION_QS_TILE_PREFERENCES) and
+          through explicit intents.
+        -->
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:resizeableActivity="true"
+            android:maxAspectRatio="3.0"
+            tools:ignore="DiscouragedApi,UnusedAttribute"
+            android:configChanges="screenSize|orientation|keyboardHidden">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE_PREFERENCES" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+
+        <activity-alias
+            android:name=".LauncherAlias"
+            android:targetActivity=".MainActivity"
+            android:enabled="true"
+            android:exported="true"
+            android:icon="@drawable/app_icon"
+            android:label="@string/app_name">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <service
+            android:name=".GuardService"
+            android:exported="false"
+            android:stopWithTask="false" />
+
+        <service
+            android:name=".GuardTileService"
+            android:exported="true"
+            android:icon="@drawable/app_icon"
+            android:label="@string/tile_label"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+
+        <receiver
+            android:name=".BootReceiver"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
+    </application>
+</manifest>

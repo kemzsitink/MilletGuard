@@ -1,0 +1,7 @@
+# Normalize line endings in the repository; scripts must stay LF.
+* text=auto eol=lf
+*.bat text eol=crlf
+gradlew text eol=lf
+*.jar binary
+*.png binary
+*.keystore binary
