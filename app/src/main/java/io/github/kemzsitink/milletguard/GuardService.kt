@@ -32,6 +32,11 @@ class GuardService : Service() {
 
     private val repairDebounced = Runnable { repair(true) }
 
+    // The notification text must follow the in-app language below Android 13 too.
+    override fun attachBaseContext(newBase: Context) {
+        super.attachBaseContext(LocaleHelper.apply(newBase))
+    }
+
     override fun onCreate() {
         super.onCreate()
         applyExecutionMode()

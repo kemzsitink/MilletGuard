@@ -57,10 +57,9 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import io.github.kemzsitink.milletguard.LauncherAlias
+import io.github.kemzsitink.milletguard.Packages
 import io.github.kemzsitink.milletguard.R
 import kotlinx.coroutines.launch
-
-private const val GMS = "com.google.android.gms"
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class, ExperimentalLayoutApi::class)
 @Composable
@@ -172,7 +171,7 @@ fun AdvancedScreen(vm: GuardViewModel, state: GuardState, messenger: Messenger, 
                             shapes = ListItemDefaults.segmentedShapes(i, state.whitelist.size),
                             colors = groupColors(),
                             trailingContent = when (pkg) {
-                                GMS -> ({ Badge { Text(stringResource(R.string.badge_gms)) } })
+                                Packages.GMS -> ({ Badge { Text(stringResource(R.string.badge_gms)) } })
                                 context.packageName -> ({ Badge { Text(stringResource(R.string.badge_self)) } })
                                 else -> null
                             },

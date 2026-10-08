@@ -45,8 +45,8 @@ object FcmAppScanner {
         val result = ArrayList<AppEntry>()
         for (packageName in packages) {
             if (packageName == context.packageName ||
-                packageName == "com.google.android.gms" ||
-                packageName == "com.android.vending"
+                packageName == Packages.GMS ||
+                packageName == Packages.PLAY_STORE
             ) {
                 continue
             }

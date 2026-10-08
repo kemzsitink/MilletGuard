@@ -85,8 +85,7 @@ fun AppShell(vm: GuardViewModel, onLegacyLanguageChanged: () -> Unit) {
     var advancedOpen by rememberSaveable { mutableStateOf(false) }
 
     LifecycleResumeEffect(Unit) {
-        vm.refresh()
-        vm.ensureServiceRunning()
+        vm.onResume()
         onPauseOrDispose { }
     }
 

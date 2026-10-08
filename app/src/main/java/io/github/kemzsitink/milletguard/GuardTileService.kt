@@ -2,6 +2,7 @@ package io.github.kemzsitink.milletguard
 
 import android.annotation.SuppressLint
 import android.app.PendingIntent
+import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.provider.Settings
@@ -17,6 +18,11 @@ import androidx.core.net.toUri
  * runs the exact same enable/disable sequence as the dashboard via ProtectionController.
  */
 class GuardTileService : TileService() {
+
+    // The tile state description must follow the in-app language below Android 13 too.
+    override fun attachBaseContext(newBase: Context) {
+        super.attachBaseContext(LocaleHelper.apply(newBase))
+    }
 
     override fun onTileAdded() {
         super.onTileAdded()

@@ -79,7 +79,7 @@ object SettingsGuard {
         Settings.System.getString(context.contentResolver, getConfiguredKey(context))
 
     /** Package names currently exempt from HyperOS Millet background limits. */
-    fun readNoRestrictPackages(context: Context): Set<String> = parse(read(context))
+    fun readNoRestrictPackages(context: Context): Set<String> = Whitelist.parse(read(context))
 
     /**
      * Applies the user's checklist choice: FCM packages that are checked join the
@@ -94,40 +94,20 @@ object SettingsGuard {
         selected: Set<String>,
     ): Int {
         if (!canWrite(context)) return -1
-        val all = parse(read(context))
-        var changed = 0
-        for (pkg in fcmPackages) {
-            val want = pkg in selected
-            val has = pkg in all
-            if (want && !has) {
-                all.add(pkg)
-                changed++
-            } else if (!want && has) {
-                all.remove(pkg)
-                changed++
-            }
-        }
-        if (changed == 0) return 0
-        val value = join(all)
+        val selection = Whitelist.select(read(context), fcmPackages, selected)
+        if (selection.changed == 0) return 0
+        val key = getConfiguredKey(context)
         return try {
-            val ok = Settings.System.putString(
-                context.contentResolver, getConfiguredKey(context), value,
-            )
-            if (!ok) return -1
-            saveLastGoodIfChanged(prefs(context), getConfiguredKey(context), value)
-            changed
+            if (!Settings.System.putString(context.contentResolver, key, selection.value)) return -1
+            saveLastGoodIfChanged(prefs(context), key, selection.value)
+            selection.changed
         } catch (ignored: Throwable) {
             -1
         }
     }
 
-    fun hasRequiredItem(context: Context, value: String?): Boolean {
-        val required = getConfiguredRequiredItem(context)
-        if (required.javaTrim().isEmpty() || value == null || value.javaTrim().isEmpty()) {
-            return false
-        }
-        return value.split(',').any { required == it.javaTrim() }
-    }
+    fun hasRequiredItem(context: Context, value: String?): Boolean =
+        Whitelist.contains(value, getConfiguredRequiredItem(context))
 
     /**
      * Repairs only when necessary. A no-op repair performs no Settings write and, unless
@@ -141,28 +121,16 @@ object SettingsGuard {
         }
 
         val key = getConfiguredKey(context)
-        val required = getConfiguredRequiredItem(context)
         val current = read(context)
-
-        if (hasRequiredItem(context, current)) {
+        val prefs = prefs(context)
+        val repaired = Whitelist.repaired(
+            current, prefs.getString(LAST_GOOD_PREFIX + key, null), getConfiguredRequiredItem(context),
+        )
+        if (repaired == null) {
             rememberIfUseful(context, current)
             return Result(true, false, current, context.getString(R.string.already_protected))
         }
 
-        val packages = parse(current)
-        val prefs = prefs(context)
-        if (packages.isEmpty()) {
-            packages.addAll(parse(prefs.getString(LAST_GOOD_PREFIX + key, null)))
-        }
-        if (packages.isEmpty()) {
-            packages.add("com.tencent.mm")
-            packages.add("com.android.vending")
-        }
-        if (required.javaTrim().isNotEmpty()) {
-            packages.add(required.javaTrim())
-        }
-
-        val repaired = join(packages)
         return try {
             val ok = Settings.System.putString(context.contentResolver, key, repaired)
             if (ok) {
@@ -185,11 +153,9 @@ object SettingsGuard {
     }
 
     private fun rememberIfUseful(context: Context, current: String?) {
-        if (current == null || current.javaTrim().isEmpty()) return
-        val key = getConfiguredKey(context)
-        val packages = parse(current)
+        val packages = Whitelist.parse(current)
         if (packages.isEmpty()) return
-        saveLastGoodIfChanged(prefs(context), key, join(packages))
+        saveLastGoodIfChanged(prefs(context), getConfiguredKey(context), Whitelist.join(packages))
     }
 
     private fun saveLastGoodIfChanged(prefs: SharedPreferences, key: String, value: String) {
@@ -198,20 +164,6 @@ object SettingsGuard {
             prefs.edit { putString(prefKey, value) }
         }
     }
-
-    private fun parse(value: String?): LinkedHashSet<String> {
-        val out = LinkedHashSet<String>()
-        value?.split(',')?.forEach { part ->
-            val p = part.javaTrim()
-            if (p.isNotEmpty()) out.add(p)
-        }
-        return out
-    }
-
-    private fun join(items: Set<String>): String = items.joinToString(",")
-
-    /** java.lang.String.trim() semantics (strips chars <= U+0020), kept for exact parity. */
-    private fun String.javaTrim(): String = trim { it <= ' ' }
 
     class Result internal constructor(
         val success: Boolean,

@@ -9,7 +9,7 @@ import androidx.core.content.edit
 import java.util.Locale
 
 object LocaleHelper {
-    private const val PREFS = "guard_state"
+    private const val PREFS = SettingsGuard.PREFS
     private const val KEY_LANG = "ui_language"
     private const val KEY_MIGRATED = "native_locale_migrated"
     private const val SYSTEM = "system"

@@ -11,10 +11,7 @@ object FcmReconnect {
     private const val ACTION_GTALK_HEARTBEAT = "com.google.android.intent.action.GTALK_HEARTBEAT"
     private const val ACTION_MCS_HEARTBEAT = "com.google.android.intent.action.MCS_HEARTBEAT"
 
-    private val TARGET_PACKAGES = arrayOf(
-        "com.google.android.gms",
-        "com.google.android.gsf",
-    )
+    private val TARGET_PACKAGES = arrayOf(Packages.GMS, Packages.GSF)
 
     /** Returns true if the heartbeats were sent to at least one target package. */
     fun kick(context: Context): Boolean {

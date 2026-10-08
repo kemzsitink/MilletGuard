@@ -115,6 +115,7 @@ Requirements: JDK 17 and the Android SDK (platform 37, build-tools 36).
 
 ```sh
 ./gradlew :app:assembleDebug        # debug build
+./gradlew :app:testDebugUnitTest    # unit tests (list repair rules, home screen states)
 ./gradlew :app:lintDebug            # lint
 ./gradlew :app:assembleRelease      # R8-shrunk release build
 ```
@@ -133,8 +134,9 @@ Without that file, release builds fall back to the debug key, which is fine for 
 
 ### Continuous integration
 
-[`.github/workflows/build-apk.yml`](.github/workflows/build-apk.yml) runs lint and builds the release APK on every
-push and pull request. Pushing a tag such as `v2.0.0` (it must match `versionName`) publishes a GitHub Release.
+[`.github/workflows/build-apk.yml`](.github/workflows/build-apk.yml) runs the unit tests and lint and builds the
+release APK on every push and pull request. Pushing a tag such as `v2.0.0` (it must match `versionName`) publishes
+a GitHub Release.
 
 Release signing uses these repository secrets (*Settings → Secrets and variables → Actions*):
 

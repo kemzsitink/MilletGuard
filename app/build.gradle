@@ -53,6 +53,13 @@ android {
         compose true
     }
 
+    // The APK is never uploaded to Google Play, the only consumer of this encrypted
+    // dependency report. F-Droid / IzzyOnDroid scanners flag it as an opaque blob.
+    dependenciesInfo {
+        includeInApk = false
+        includeInBundle = false
+    }
+
     lint {
         // targetSdk 22 is deliberate: it lets WRITE_SETTINGS edit Xiaomi's private
         // Settings.System whitelist (see AndroidManifest.xml). The app is not on Play.
@@ -80,4 +87,6 @@ dependencies {
     implementation 'androidx.core:core-ktx:1.19.1'
     implementation 'androidx.lifecycle:lifecycle-runtime-compose:2.11.0'
     implementation 'androidx.lifecycle:lifecycle-viewmodel-compose:2.11.0'
+
+    testImplementation 'junit:junit:4.13.2'
 }

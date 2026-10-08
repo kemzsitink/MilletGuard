@@ -12,12 +12,13 @@ import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
 import io.github.kemzsitink.milletguard.GuardTileService
 import io.github.kemzsitink.milletguard.HyperOsSettings
+import io.github.kemzsitink.milletguard.Packages
 import io.github.kemzsitink.milletguard.R
 import java.util.Locale
 
 /** Deep links into system / HyperOS / Google Play services screens. All are best effort. */
 object SystemIntents {
-    private const val GMS = "com.google.android.gms"
+    private const val GMS = Packages.GMS
     private val DIAGNOSTICS = listOf(
         "com.google.android.gms.gcm.GcmDiagnostics",
         "com.google.android.gms.gtalkservice.diagnostics.GTalkServiceDiagnostics",
@@ -90,7 +91,7 @@ object SystemIntents {
             context.resolves(
                 Intent().setComponent(
                     ComponentName(
-                        "com.miui.securitycenter",
+                        Packages.SECURITY_CENTER,
                         "com.miui.permcenter.autostart.AutoStartManagementActivity",
                     ),
                 ),
