@@ -144,7 +144,8 @@ Without that file, release builds fall back to the debug key, which is fine for 
 
 [`.github/workflows/build-apk.yml`](.github/workflows/build-apk.yml) runs the unit tests and lint and builds the
 release APK on every push and pull request. Pushing a tag such as `v2.0.0` (it must match `versionName`) publishes
-a GitHub Release.
+a GitHub Release. Without git, open *Actions → Build APK → Run workflow*, pick the branch, and tick **publish**: that
+releases the branch as `v<versionName>` and creates the tag.
 
 Release signing uses these repository secrets (*Settings → Secrets and variables → Actions*):
 
