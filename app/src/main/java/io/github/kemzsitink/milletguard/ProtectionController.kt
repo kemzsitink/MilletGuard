@@ -25,7 +25,7 @@ object ProtectionController {
         }
 
         val repair = SettingsGuard.repair(context)
-        if (repair.changed) FcmReconnect.kick(context)
+        if (repair.requiredRestored) FcmReconnect.recover(context)
         return Result(true, repair.message)
     }
 

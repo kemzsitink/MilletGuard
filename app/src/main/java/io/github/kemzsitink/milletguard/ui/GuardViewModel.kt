@@ -276,7 +276,7 @@ class GuardViewModel(app: Application) : AndroidViewModel(app) {
             emit(UiEvent.Rejected)
             return@busyAction
         }
-        if (outcome.changed) FcmReconnect.kick(ctx)
+        if (outcome.requiredRestored) FcmReconnect.recover(ctx)
         _state.update { it.copy(rejectedMessage = null) }
         if (!SettingsGuard.isProtectionEnabled(ctx)) {
             val enabled = withContext(Dispatchers.Default) { ProtectionController.enable(localized) }
@@ -298,7 +298,7 @@ class GuardViewModel(app: Application) : AndroidViewModel(app) {
                 emit(UiEvent.Rejected)
             }
             outcome.changed -> {
-                FcmReconnect.kick(ctx)
+                if (outcome.requiredRestored) FcmReconnect.recover(ctx)
                 _state.update { it.copy(rejectedMessage = null) }
                 emit(UiEvent.Repaired)
             }
@@ -307,7 +307,7 @@ class GuardViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun reconnect() {
-        FcmReconnect.kick(ctx)
+        FcmReconnect.recover(ctx)
         emit(UiEvent.ReconnectSent)
     }
 

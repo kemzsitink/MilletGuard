@@ -29,16 +29,18 @@ internal object Whitelist {
     }
 
     /**
-     * The list to write so that [required] is present, or null when [current] already has it.
-     * Every existing entry is kept. An empty list is rebuilt from [lastGood], then from [SEED],
-     * so a wiped setting never ends up holding only [required].
+     * The list to write so that every package of [required] is present, or null when [current]
+     * already has them all. Every existing entry is kept and missing ones are appended in
+     * [required] order. An empty list is rebuilt from [lastGood], then from [SEED], so a wiped
+     * setting never ends up holding only [required].
      */
-    fun repaired(current: String?, lastGood: String?, required: String): String? {
-        if (contains(current, required)) return null
+    fun repaired(current: String?, lastGood: String?, required: Collection<String>): String? {
+        val wanted = required.map { it.javaTrim() }.filter { it.isNotEmpty() }
         val packages = parse(current)
+        if (packages.containsAll(wanted)) return null
         if (packages.isEmpty()) packages.addAll(parse(lastGood))
         if (packages.isEmpty()) packages.addAll(SEED)
-        required.javaTrim().takeIf { it.isNotEmpty() }?.let(packages::add)
+        packages.addAll(wanted)
         return join(packages)
     }
 

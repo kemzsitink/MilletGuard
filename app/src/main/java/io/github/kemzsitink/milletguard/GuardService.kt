@@ -56,8 +56,8 @@ class GuardService : Service() {
 
     private fun repair(notifyFailure: Boolean) {
         val result = SettingsGuard.repair(this)
-        if (result.changed) {
-            FcmReconnect.kick(this)
+        if (result.requiredRestored) {
+            FcmReconnect.recover(this)
             if (foreground) refreshNotification(getString(R.string.notification_repaired))
         } else if (!result.success && notifyFailure && foreground) {
             refreshNotification(result.message)
