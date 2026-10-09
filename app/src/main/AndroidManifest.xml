@@ -52,9 +52,15 @@
           through the Quick Settings tile long-press (ACTION_QS_TILE_PREFERENCES) and
           through explicit intents.
         -->
+        <!--
+          singleTop: the launcher (MAIN+LAUNCHER via the alias) and getLaunchIntentForPackage()
+          (MAIN+INFO, e.g. the installer's Open button) use different categories, so the task
+          would otherwise stack a second MainActivity instead of resuming the first.
+        -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
+            android:launchMode="singleTop"
             android:resizeableActivity="true"
             android:maxAspectRatio="3.0"
             tools:ignore="DiscouragedApi,UnusedAttribute"
