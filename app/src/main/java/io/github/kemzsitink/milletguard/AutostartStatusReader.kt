@@ -3,6 +3,7 @@ package io.github.kemzsitink.milletguard
 import android.annotation.SuppressLint
 import android.app.AppOpsManager
 import android.content.Context
+import java.lang.reflect.Method
 
 /**
  * Best-effort, read-only probe for Xiaomi/HyperOS Autostart AppOps.
@@ -44,28 +45,31 @@ object AutostartStatusReader {
     /**
      * Xiaomi keeps these vendor AppOps outside the public SDK constants and they are only
      * reachable through the hidden `checkOpNoThrow`. Reflection keeps the app
-     * compileSdk-clean while preserving a strictly read-only path.
+     * compileSdk-clean while preserving a strictly read-only path. The lookup runs once:
+     * the Apps tab checks two ops for every listed app.
      */
+    private val checkOpNoThrow: Method? by lazy { findCheckOpNoThrow() }
+
     @SuppressLint("DiscouragedPrivateApi", "SoonBlockedPrivateApi")
+    private fun findCheckOpNoThrow(): Method? {
+        val params = arrayOf(Int::class.javaPrimitiveType, Int::class.javaPrimitiveType, String::class.java)
+        return try {
+            AppOpsManager::class.java.getMethod("checkOpNoThrow", *params)
+        } catch (ignored: Throwable) {
+            try {
+                AppOpsManager::class.java.getDeclaredMethod("checkOpNoThrow", *params)
+                    .apply { isAccessible = true }
+            } catch (ignored: Throwable) {
+                null
+            }
+        }
+    }
+
     private fun checkOp(context: Context, op: Int, uid: Int, packageName: String): Int? {
         val manager = context.getSystemService(Context.APP_OPS_SERVICE) as? AppOpsManager
             ?: return null
-
-        try {
-            val method = AppOpsManager::class.java.getMethod(
-                "checkOpNoThrow", Int::class.javaPrimitiveType, Int::class.javaPrimitiveType,
-                String::class.java,
-            )
-            return method.invoke(manager, op, uid, packageName) as? Int
-        } catch (ignored: Throwable) {
-        }
-
+        val method = checkOpNoThrow ?: return null
         return try {
-            val method = AppOpsManager::class.java.getDeclaredMethod(
-                "checkOpNoThrow", Int::class.javaPrimitiveType, Int::class.javaPrimitiveType,
-                String::class.java,
-            )
-            method.isAccessible = true
             method.invoke(manager, op, uid, packageName) as? Int
         } catch (ignored: Throwable) {
             null

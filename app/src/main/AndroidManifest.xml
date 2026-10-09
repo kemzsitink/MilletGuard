@@ -52,9 +52,15 @@
           through the Quick Settings tile long-press (ACTION_QS_TILE_PREFERENCES) and
           through explicit intents.
         -->
+        <!--
+          singleTop: the launcher (MAIN+LAUNCHER via the alias) and getLaunchIntentForPackage()
+          (MAIN+INFO, e.g. the installer's Open button) use different categories, so the task
+          would otherwise stack a second MainActivity instead of resuming the first.
+        -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
+            android:launchMode="singleTop"
             android:resizeableActivity="true"
             android:maxAspectRatio="3.0"
             tools:ignore="DiscouragedApi,UnusedAttribute"
@@ -62,6 +68,16 @@
             <intent-filter>
                 <action android:name="android.service.quicksettings.action.QS_TILE_PREFERENCES" />
                 <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+            <!--
+              Launchers list only CATEGORY_LAUNCHER, but getLaunchIntentForPackage() tries
+              CATEGORY_INFO first. HyperOS's PowerKeeper uses that call to decide whether an
+              app has an icon; for apps without one it hides the battery setting and can reset
+              it to the default. With this filter, hiding the launcher alias leaves step 4 alone.
+            -->
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.INFO" />
             </intent-filter>
         </activity>
 

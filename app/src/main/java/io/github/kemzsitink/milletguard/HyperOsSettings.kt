@@ -8,7 +8,7 @@ import androidx.core.net.toUri
 
 /** HyperOS/MIUI settings deep links with safe Android fallbacks. */
 object HyperOsSettings {
-    private const val SECURITY_CENTER = "com.miui.securitycenter"
+    private const val SECURITY_CENTER = Packages.SECURITY_CENTER
 
     fun openAutoStartManager(context: Context): Boolean {
         val intent = Intent("miui.intent.action.OP_AUTO_START")

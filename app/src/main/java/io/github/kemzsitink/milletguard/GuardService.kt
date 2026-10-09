@@ -32,6 +32,11 @@ class GuardService : Service() {
 
     private val repairDebounced = Runnable { repair(true) }
 
+    // The notification text must follow the in-app language below Android 13 too.
+    override fun attachBaseContext(newBase: Context) {
+        super.attachBaseContext(LocaleHelper.apply(newBase))
+    }
+
     override fun onCreate() {
         super.onCreate()
         applyExecutionMode()
@@ -51,8 +56,8 @@ class GuardService : Service() {
 
     private fun repair(notifyFailure: Boolean) {
         val result = SettingsGuard.repair(this)
-        if (result.changed) {
-            FcmReconnect.kick(this)
+        if (result.requiredRestored) {
+            FcmReconnect.recover(this)
             if (foreground) refreshNotification(getString(R.string.notification_repaired))
         } else if (!result.success && notifyFailure && foreground) {
             refreshNotification(result.message)

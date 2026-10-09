@@ -1,5 +1,6 @@
 package io.github.kemzsitink.milletguard.ui
 
+import android.util.LruCache
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -20,9 +21,11 @@ import androidx.compose.runtime.produceState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
@@ -53,15 +56,26 @@ fun SectionHeader(text: String, modifier: Modifier = Modifier) {
 
 fun LazyListScope.gap(height: Dp = 12.dp) = item { Spacer(Modifier.size(height)) }
 
+/**
+ * Decoded launcher icons. Lazy rows leave composition while scrolling, so without this every
+ * icon would be decoded again and flash its placeholder each time it scrolls back into view.
+ */
+private val iconCache = object : LruCache<String, ImageBitmap>(4 * 1024 * 1024) {
+    override fun sizeOf(key: String, value: ImageBitmap): Int = value.width * value.height * 4
+}
+
 /** Launcher icon of another app, loaded off the main thread. */
 @Composable
 fun AppIcon(packageName: String, size: Dp = 40.dp) {
     val context = LocalContext.current
-    val px = with(androidx.compose.ui.platform.LocalDensity.current) { size.roundToPx() }
-    val bitmap by produceState<ImageBitmap?>(null, packageName) {
+    val px = with(LocalDensity.current) { size.roundToPx() }
+    val key = "$packageName@$px"
+    val bitmap by produceState(iconCache.get(key), key) {
+        if (value != null) return@produceState
         value = withContext(Dispatchers.IO) {
             try {
                 context.packageManager.getApplicationIcon(packageName).toBitmap(px, px).asImageBitmap()
+                    .also { iconCache.put(key, it) }
             } catch (_: Throwable) {
                 null
             }
@@ -71,7 +85,7 @@ fun AppIcon(packageName: String, size: Dp = 40.dp) {
         Modifier
             .size(size)
             .clip(MaterialTheme.shapes.medium)
-            .background(if (bitmap == null) MaterialTheme.colorScheme.surfaceContainerHighest else MaterialTheme.colorScheme.surface.copy(alpha = 0f)),
+            .background(if (bitmap == null) MaterialTheme.colorScheme.surfaceContainerHighest else Color.Transparent),
         contentAlignment = Alignment.Center,
     ) {
         bitmap?.let { Image(it, contentDescription = null, modifier = Modifier.size(size)) }

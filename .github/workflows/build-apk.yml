@@ -53,12 +53,12 @@ jobs:
             echo "::warning::No signing secret; this build uses the debug key and is for testing only."
           fi
 
-      - name: Lint and build
+      - name: Test, lint and build
         env:
           SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
           SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
           SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
-        run: ./gradlew :app:lintDebug :app:assembleRelease --stacktrace
+        run: ./gradlew :app:testDebugUnitTest :app:lintDebug :app:assembleRelease --stacktrace
 
       - name: Name the APK
         id: apk
@@ -85,12 +85,14 @@ jobs:
           path: ${{ steps.apk.outputs.name }}
           retention-days: 30
 
-      - name: Upload lint report
+      - name: Upload lint and test reports
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: lint-report
-          path: app/build/reports/lint-results-debug.html
+          name: reports
+          path: |
+            app/build/reports/lint-results-debug.html
+            app/build/reports/tests/
           if-no-files-found: ignore
 
       - name: Publish GitHub Release

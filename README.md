@@ -72,12 +72,16 @@ flowchart TD
     C -- Yes --> D[Do nothing]
     C -- No --> E[Keep every existing entry]
     E --> F[Append com.google.android.gms and write once]
-    F --> G[Send an FCM reconnect heartbeat]
+    F --> G[Thaw GMS, then ask it to reconnect]
 ```
 
 - **Only one setting is watched**, with a ~400 ms debounce, and nothing is written when GMS is already present.
 - **Fallback check every 30 minutes** runs in-process — no `AlarmManager`, exact alarm, or wake lock.
-- **Reconnect broadcasts** (`GTALK_HEARTBEAT` / `MCS_HEARTBEAT`) are sent only after a real repair or on request.
+- **Thaw, then reconnect.** With the screen off, HyperOS does not deliver broadcasts to a frozen GMS, but it thaws
+  GMS for any content provider call. So after a real repair (or on request) MilletGuard first queries the exported
+  `com.google.android.gms.chimera` provider, waits two seconds, and then sends `GCM_RECONNECT` and heartbeat broadcasts.
+- **Your choices are kept.** MilletGuard itself (setup step 4) and the apps you set to *No restrictions* in the **Apps**
+  tab are put back whenever HyperOS rebuilds the list without them.
 - **Persistent mode** runs the guard as a foreground service with a silent `IMPORTANCE_LOW` channel.
 
 ### Why `targetSdk 22`?
@@ -94,12 +98,16 @@ notification it shows uses FCM.
 Autostart status is read **read-only, best effort** from Xiaomi's vendor AppOps (`10008`, `10053`). When HyperOS
 blocks the query the app says so instead of guessing, and nothing is ever changed programmatically.
 
-### Known limitation: HyperOS rebuilds the list
+### HyperOS rebuilds the list
 
 HyperOS regenerates `MILLET_NO_RESTRICT_APP` from its own per-app battery settings (for example after an app is
-installed or updated). Google Play services is put back automatically, but other apps you switched to
-*No restrictions* from the **Apps** tab can be dropped again by such a rebuild. To make an app's exemption permanent,
-set it in that app's HyperOS battery settings (**Open in HyperOS** in the app sheet).
+installed or updated). MilletGuard puts back Google Play services, itself, and every app you switched to
+*No restrictions* in the **Apps** tab. Such an entry only stops HyperOS from freezing the app; for the full HyperOS
+*No restrictions* profile, also set it in that app's HyperOS battery settings (**Open in HyperOS** in the app sheet).
+Switching an app off in the **Apps** tab is what makes MilletGuard stop putting it back.
+
+Hiding the launcher icon keeps step 4 intact: MilletGuard declares a `CATEGORY_INFO` entry, so HyperOS still treats
+it as an app with an icon instead of hiding its battery setting and possibly resetting it.
 
 ## Permissions and privacy
 
@@ -115,6 +123,7 @@ Requirements: JDK 17 and the Android SDK (platform 37, build-tools 36).
 
 ```sh
 ./gradlew :app:assembleDebug        # debug build
+./gradlew :app:testDebugUnitTest    # unit tests (list repair rules, home screen states)
 ./gradlew :app:lintDebug            # lint
 ./gradlew :app:assembleRelease      # R8-shrunk release build
 ```
@@ -133,8 +142,9 @@ Without that file, release builds fall back to the debug key, which is fine for 
 
 ### Continuous integration
 
-[`.github/workflows/build-apk.yml`](.github/workflows/build-apk.yml) runs lint and builds the release APK on every
-push and pull request. Pushing a tag such as `v2.0.0` (it must match `versionName`) publishes a GitHub Release.
+[`.github/workflows/build-apk.yml`](.github/workflows/build-apk.yml) runs the unit tests and lint and builds the
+release APK on every push and pull request. Pushing a tag such as `v2.0.0` (it must match `versionName`) publishes
+a GitHub Release.
 
 Release signing uses these repository secrets (*Settings → Secrets and variables → Actions*):
 

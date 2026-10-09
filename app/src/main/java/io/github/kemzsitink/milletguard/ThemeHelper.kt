@@ -4,7 +4,7 @@ import android.content.Context
 import androidx.core.content.edit
 
 object ThemeHelper {
-    private const val PREFS = "guard_state"
+    private const val PREFS = SettingsGuard.PREFS
     private const val KEY_MODE = "appearance_mode"
 
     const val MODE_SYSTEM = "system"

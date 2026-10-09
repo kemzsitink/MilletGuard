@@ -13,9 +13,11 @@ import io.github.kemzsitink.milletguard.FcmReconnect
 import io.github.kemzsitink.milletguard.GuardService
 import io.github.kemzsitink.milletguard.LauncherAlias
 import io.github.kemzsitink.milletguard.LocaleHelper
+import io.github.kemzsitink.milletguard.Packages
 import io.github.kemzsitink.milletguard.ProtectionController
 import io.github.kemzsitink.milletguard.SettingsGuard
 import io.github.kemzsitink.milletguard.ThemeHelper
+import io.github.kemzsitink.milletguard.Whitelist
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
@@ -28,7 +30,6 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-private const val GMS = "com.google.android.gms"
 private const val PREF_AUTOSTART_CONFIRMED = "autostart_confirmed"
 private const val BUSY_MIN_MS = 500L
 
@@ -106,6 +107,12 @@ val AppsState.rows: List<AppRow>?
         AppsState.NotScanned -> null
     }
 
+private fun AppsState.mapRows(transform: (AppRow) -> AppRow): AppsState = when (this) {
+    is AppsState.Done -> AppsState.Done(apps.map(transform))
+    is AppsState.Scanning -> AppsState.Scanning(previous?.map(transform))
+    AppsState.NotScanned -> this
+}
+
 /** One-shot UI events that the shell turns into snackbars / haptics. */
 sealed interface UiEvent {
     data object Fine : UiEvent
@@ -143,30 +150,40 @@ class GuardViewModel(app: Application) : AndroidViewModel(app) {
         _events.trySend(event)
     }
 
-    /** Re-reads every source of truth. Synchronous and cheap; runs on resume and after actions. */
+    /** On resume: returning from HyperOS pages may have changed anything, per-app facts included. */
+    fun onResume() {
+        refresh()
+        refreshAppFacts()
+        ensureServiceRunning()
+    }
+
+    /**
+     * Re-reads the global state. Synchronous and cheap, so it also runs on every window focus
+     * change and after every action; the per-app queries live in [refreshAppFacts].
+     */
     fun refresh() {
         val c = ctx
         val raw = SettingsGuard.read(c)
-        val whitelist = raw.orEmpty().split(',').map { it.trim() }.filter { it.isNotEmpty() }
+        val listed = Whitelist.parse(raw)
         val present = SettingsGuard.hasRequiredItem(c, raw)
         // Without the channel, Android reports notifications as blocked even on a fresh install.
         if (SettingsGuard.usePersistentNotification(c)) GuardService.ensureNotificationChannel(c)
         _state.update { old ->
             GuardState(
-                gmsInstalled = isInstalled(c, GMS),
+                gmsInstalled = isInstalled(c, Packages.GMS),
                 canWrite = SettingsGuard.canWrite(c),
                 protectionEnabled = SettingsGuard.isProtectionEnabled(c),
                 gmsPresent = present,
                 persistentNotification = SettingsGuard.usePersistentNotification(c),
                 notificationAllowed = GuardService.canShowPersistentNotification(c),
                 whitelistRaw = raw,
-                whitelist = whitelist,
+                whitelist = listed.toList(),
                 tileAdded = SettingsGuard.isTileAdded(c),
                 iconHidden = LauncherAlias.isHidden(c),
                 autoHideSettled = SettingsGuard.isAutoHideSettled(c),
                 selfAutostart = AutostartStatusReader.check(c, c.packageName),
                 autostartConfirmed = prefs.getBoolean(PREF_AUTOSTART_CONFIRMED, false),
-                selfNoRestrict = whitelist.contains(c.packageName),
+                selfNoRestrict = c.packageName in listed,
                 themeMode = ThemeHelper.getMode(c),
                 language = LocaleHelper.getLanguage(c),
                 settingsKey = SettingsGuard.getConfiguredKey(c),
@@ -177,19 +194,28 @@ class GuardViewModel(app: Application) : AndroidViewModel(app) {
                 busy = old.busy,
             )
         }
-        // Returning from HyperOS pages may have changed any of these per-app facts.
-        val live = { row: AppRow ->
-            row.copy(
-                noRestrict = whitelist.contains(row.packageName),
-                autostart = AutostartStatusReader.check(c, row.packageName),
-                stopped = isStopped(c, row.packageName),
-            )
-        }
-        _apps.update { apps ->
-            when (apps) {
-                is AppsState.Done -> AppsState.Done(apps.apps.map(live))
-                is AppsState.Scanning -> AppsState.Scanning(apps.previous?.map(live))
-                AppsState.NotScanned -> apps
+        // The list was just read anyway, so the rows' switches stay exact after every write.
+        _apps.update { apps -> apps.mapRows { it.copy(noRestrict = it.packageName in listed) } }
+    }
+
+    /**
+     * Autostart and stopped state of every listed app. That is several binder calls per app,
+     * so it runs off the main thread and only when HyperOS pages may have changed them.
+     */
+    private fun refreshAppFacts() {
+        val rows = _apps.value.rows ?: return
+        viewModelScope.launch {
+            val facts = withContext(Dispatchers.Default) {
+                rows.associate {
+                    it.packageName to (AutostartStatusReader.check(ctx, it.packageName) to isStopped(ctx, it.packageName))
+                }
+            }
+            _apps.update { apps ->
+                apps.mapRows { row ->
+                    facts[row.packageName]?.let { (autostart, stopped) ->
+                        row.copy(autostart = autostart, stopped = stopped)
+                    } ?: row
+                }
             }
         }
     }
@@ -250,7 +276,7 @@ class GuardViewModel(app: Application) : AndroidViewModel(app) {
             emit(UiEvent.Rejected)
             return@busyAction
         }
-        if (outcome.changed) FcmReconnect.kick(ctx)
+        if (outcome.requiredRestored) FcmReconnect.recover(ctx)
         _state.update { it.copy(rejectedMessage = null) }
         if (!SettingsGuard.isProtectionEnabled(ctx)) {
             val enabled = withContext(Dispatchers.Default) { ProtectionController.enable(localized) }
@@ -272,7 +298,7 @@ class GuardViewModel(app: Application) : AndroidViewModel(app) {
                 emit(UiEvent.Rejected)
             }
             outcome.changed -> {
-                FcmReconnect.kick(ctx)
+                if (outcome.requiredRestored) FcmReconnect.recover(ctx)
                 _state.update { it.copy(rejectedMessage = null) }
                 emit(UiEvent.Repaired)
             }
@@ -281,7 +307,7 @@ class GuardViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun reconnect() {
-        FcmReconnect.kick(ctx)
+        FcmReconnect.recover(ctx)
         emit(UiEvent.ReconnectSent)
     }
 
@@ -305,12 +331,12 @@ class GuardViewModel(app: Application) : AndroidViewModel(app) {
         refresh()
     }
 
-    /** Called on resume: keeps the foreground service alive if the user expects it. */
-    fun ensureServiceRunning() {
-        val s = _state.value
-        if (s.protectionEnabled && s.persistentNotification && s.notificationAllowed) {
-            ProtectionController.ensureRunning(ctx)
-        }
+    /**
+     * Restarts the guard if HyperOS killed it while protection is on, in quiet mode and with
+     * blocked notifications too: opening the app is the most reliable chance to revive it.
+     */
+    private fun ensureServiceRunning() {
+        if (SettingsGuard.isProtectionEnabled(ctx)) ProtectionController.ensureRunning(ctx)
     }
 
     fun setThemeMode(mode: String) {
